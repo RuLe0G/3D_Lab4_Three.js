@@ -8,11 +8,19 @@ var circle;
 var radius = 10;
 var clock = new THREE.Clock();
 var Bdirectional = 0;
+var BMGlob = 1;
+var brVis;
+var models = new Map();
+//объект интерфейса и его ширина
+var gui = new dat.GUI();
+gui.width = 200;
+
+var selected = null;
 
 var mouse = { x: 0, y: 0 }; //переменная для хранения координат мыши
 //массив для объектов, проверяемых на пересечение с курсором
 var targetList = []; 
-
+var objList = []; 
 init();
 animate();
 
@@ -66,7 +74,14 @@ function init()
     Cursor();
     Circle();
     CreateTerrain();
+    Gui();
 
+    loadModel('models/Cyprys_House/', 'Cyprys_House.obj','Cyprys_House.mtl',1.5,'house');
+    loadModel('models/Bush1/', 'Bush1.obj','Bush1.mtl',4,'bush');
+    loadModel('models/grade/', 'grade.obj','grade.mtl',1,'grade');
+    loadModel('models/needle01/', 'needle01.obj','needle01.mtl',2,'needle');
+
+    
 
 }
 
@@ -89,8 +104,20 @@ function animate()
     var delta = clock.getDelta();
     if (Bdirectional != 0) 
     {
-        Spbruh(Bdirectional, delta);
+        switch (Bdirectional) {
+            case 3:
+                FLbruh(delta);
+                break;
+            case 4:
+                Rabruh(delta);
+                break;
+        
+            default:
+                Spbruh(Bdirectional, delta);
+                break;
+        }
     }
+
     requestAnimationFrame( animate );
     render();
 
@@ -166,7 +193,7 @@ function CreateTerrain()
     scene.add(mesh);
 
 }
-function loadModel(path, oname, mname)
+function loadModel(path, oname, mname,s,name)
 {
  // функция, выполняемая в процессе загрузки модели (выводит процент загрузки)
     var onProgress = function ( xhr ) {
@@ -190,17 +217,17 @@ function loadModel(path, oname, mname)
         // функция загрузки модели
         objLoader.load( oname, function ( object )
         {
-
+            object.castShadow = true;
             object.traverse( function ( child )
             {
              if ( child instanceof THREE.Mesh )
              {
              child.castShadow = true;
+             child.parent = object;
              }
             } );
             
-            for (var i = 0; i<60; i++)
-            {
+            object.parent = object;
                 var x = Math.random() * N;
                 var z = Math.random() * N;
 
@@ -210,12 +237,11 @@ function loadModel(path, oname, mname)
                 object.position.y = y;
                 object.position.z = z;
 
-                var s = (Math.random()*100) +30;
-                s /= 400.0;
                 object.scale.set(s,s,s);
-                scene.add(object.clone());
-                
-            }            
+                //scene.add(object);                
+                models.set(name, object);
+                //models.push(object);
+
         }, onProgress, onError );
     });
 }
@@ -225,6 +251,7 @@ function Cursor(){
     var geometry = new THREE.CylinderGeometry( 1.5, 0, 5, 64 );
     var cyMaterial = new THREE.MeshLambertMaterial( {color: 0x888888} );
     cursor = new THREE.Mesh( geometry, cyMaterial );
+    cursor.visible = false;
     scene.add( cursor );
 }
 function Circle(){
@@ -240,13 +267,16 @@ function Circle(){
     }
     
     circle = new THREE.Line( circleGeometry, material );
-    circle.scale.set(radius,1,radius);    
+    circle.scale.set(radius,1,radius);   
+    circle.visible = false; 
     scene.add( circle ); 
 }
 
 
 
 function onDocumentMouseScroll( event ){
+    if (brVis == true)
+    {
     if(radius>1 )
         if(event.wheelDelta < 0)
             radius--;
@@ -254,6 +284,7 @@ function onDocumentMouseScroll( event ){
         if(event.wheelDelta > 0)
             radius++;
     circle.scale.set(radius,1,radius); 
+    }
 }
 function onDocumentMouseMove( event ) {
     //if (Bdirectional == 0)
@@ -267,9 +298,12 @@ function onDocumentMouseMove( event ) {
     vector.unproject(camera);
     var ray = new THREE.Raycaster( camera.position,
     vector.sub( camera.position ).normalize() );
+
     // создание массива для хранения объектов, с которыми пересечётся луч
     var intersects = ray.intersectObjects( targetList );
 
+    if (brVis == true)
+    {
     // если луч пересёк какой-либо объект из списка targetList
     if ( intersects.length > 0 )
     {   
@@ -304,35 +338,88 @@ function onDocumentMouseMove( event ) {
         
         circle.geometry.verticesNeedUpdate = true; //обновление вершин
     }
+    } else
+    {
+        if ( intersects.length > 0 )
+    {
+        if(selected != null)
+        {
+            selected.position.copy(intersects[0].point);
+        }
+    }
+}
 }
 }
 var mousevisble = true;
 function onDocumentMouseDown( event ) {
+    if (brVis == true)
+    {
     if (event.which == 1) {
-        Bdirectional = 1;   
-    }
-    if (event.which == 2) {
-        if (mousevisble == true)
-        {
-        render.    
-        mousevisble = false;
-        }else
-        {            
-        
-        mousevisble = true;
-        }
-        
-    }        
+
+        switch (BMGlob) {
+            case 1:
+            Bdirectional = 1;   
+            break;
+            case 2:
+                Bdirectional = 3;  
+                break;
+            case 3:
+                Bdirectional = 4;
+               break;
+                            
+            default:
+               break;
+        } 
+    }    
     if (event.which == 3) {
-        Bdirectional = -1;   
-        //FLbruh();
-        //Rabruh(1);
+        switch (BMGlob) {
+            case 1:
+            Bdirectional = -1;   
+            break;
+            case 2:
+                Bdirectional = 3;  
+                break;
+            case 3:
+                Bdirectional = 4;
+               break;
+                            
+            default:
+               break;
+        }     
+        
+
+
+    }
+    } else
+    {
+    //определение позиции мыши
+    mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+    mouse.y = -( event.clientY / window.innerHeight ) * 2 + 1;
+
+    //создание луча, исходящего из позиции камеры и проходящего сквозь позицию курсора мыши
+    var vector = new THREE.Vector3( mouse.x, mouse.y, 1 );
+    vector.unproject(camera);
+    var ray = new THREE.Raycaster( camera.position,
+    vector.sub( camera.position ).normalize() );
+
+    // создание массива для хранения объектов, с которыми пересечётся луч
+    var intersects = ray.intersectObjects( objList, true );
+    if ( intersects.length > 0 )
+    { 
+        selected = intersects[0].object.parent;
     }
 
+    }
 }
 
 function onDocumentMouseUp( event ) {
+    if (brVis == true)
+    {
     Bdirectional = 0;
+    } else
+    {
+        selected = null;
+    }
 }
 
 function Spbruh( Bdirectional, delta )
@@ -408,4 +495,67 @@ function Rabruh( delta  )
     geometry.computeVertexNormals(); //пересчёт нормалей
     geometry.verticesNeedUpdate = true; //обновление вершин
     geometry.normalsNeedUpdate = true; //обновление нормалей
+}
+
+function Gui() {
+    //массив переменных, ассоциированных с интерфейсом
+    var params =
+    {
+        sx: 0, sy: 0, sz: 0,
+        brush: false,
+        brushmode: {'1': 0,'2':1,'3':2},
+        bm: 1,
+        addHouse: function() { addMesh('house') },
+        addBush: function() { addMesh('bush') },
+        addGrade: function() { addMesh('grade') },
+        addNeedle: function() { addMesh('needle') },
+        //del: function() { delMesh() }
+    };
+    //создание вкладки
+    var folder1 = gui.addFolder('Scale');
+    //ассоциирование переменных отвечающих за масштабирование
+    //в окне интерфейса они будут представлены в виде слайдера
+    //минимальное значение - 1, максимальное – 100, шаг – 1
+    //listen означает, что изменение переменных будет отслеживаться
+    var meshSX = folder1.add( params, 'sx' ).min(1).max(100).step(1).listen();
+    var meshSY = folder1.add( params, 'sy' ).min(1).max(100).step(1).listen();
+    var meshSZ = folder1.add( params, 'sz' ).min(1).max(100).step(1).listen();
+    //при запуске программы папка будет открыта
+    folder1.open();
+    //описание действий совершаемых при изменении ассоциированных значений
+    //meshSX.onChange(function(value) {…});
+    //meshSY.onChange(function(value) {…});
+    //meshSZ.onChange(function(value) {…});
+    //добавление чек бокса с именем brush
+    var cubeVisible = gui.add( params, 'brush' ).name('brush').listen();
+    cubeVisible.onChange(function(value)
+    {
+        brVis = value;
+        cursor.visible = value;
+        circle.visible = value;
+    });
+
+    var folder2 = gui.addFolder('BrushMode');
+    //var BrushMode = folder2.add(params, 'brushmode').name('brushmode').listen();
+    var BrushMode = folder2.add( params, 'bm' ).min(1).max(3).step(1).listen();
+    BrushMode.onChange(function(value) {
+        BMGlob = value;
+
+    })
+    //добавление кнопок, при нажатии которых будут вызываться функции addMesh
+    //и delMesh соответственно. Функции описываются самостоятельно.
+    gui.add( params, 'addHouse' ).name( "add house" );
+    gui.add( params, 'addBush' ).name( "add bush" );
+    gui.add( params, 'addGrade' ).name( "add grade" );
+    gui.add( params, 'addNeedle' ).name( "add needle" );
+    //gui.add( params, 'del' ).name( "delete" );
+
+    //при запуске программы интерфейс будет раскрыт
+    gui.open();
+}
+
+function addMesh(name) {
+    var model = models.get(name).clone();
+    objList.push(model);
+    scene.add(model);
 }
